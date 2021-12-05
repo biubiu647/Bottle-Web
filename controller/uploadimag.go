@@ -3,6 +3,9 @@ package controller
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/nfnt/resize"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"log"
 	"net/http"
@@ -15,6 +18,45 @@ import (
 )
 
 //
+
+func compressJPG(path string, quality int) {
+	file, err := os.Open(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	img, err := jpeg.Decode(file)
+	if err != nil {
+		log.Fatal(err)
+	}
+	file.Close()
+	m := resize.Resize(800, 0, img, resize.NearestNeighbor)
+	out, err := os.Create(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer out.Close()
+	jpeg.Encode(out, m, &jpeg.Options{Quality: quality})
+}
+
+func compressPNG(path string) {
+	file, err := os.Open(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	img, err := png.Decode(file)
+	if err != nil {
+		log.Fatal(err)
+	}
+	file.Close()
+	m := resize.Resize(800, 0, img, resize.NearestNeighbor)
+	out, err := os.Create(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer out.Close()
+	png.Encode(out, m)
+}
+
 func UploadImag(c *gin.Context) {
 	//解析图片，数据保存到本地，路径持久化到数据库
 	imgFile, imgHandler, err := c.Request.FormFile("img")
@@ -32,10 +74,10 @@ func UploadImag(c *gin.Context) {
 	current := time.Now()
 	//时间戳命名图片，防止重复
 	ext := strings.ToLower(path.Ext(imgHandler.Filename))
-	if !(ext == ".jpg" || ext == ".png" || ext == ".bmp" || ext == ".jpeg") {
+	if !(ext == ".jpg" || ext == ".png" || ext == ".jpeg") {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code": http.StatusInternalServerError,
-			"msg":  "图片格式只支持.jpg,.png,.bmp,.jpeg",
+			"msg":  "图片格式只支持.jpg,.png,.jpeg",
 		})
 		return
 	}
@@ -53,6 +95,15 @@ func UploadImag(c *gin.Context) {
 	if err != nil {
 		uploadError(err, c)
 		return
+	}
+	fi, _ := f.Stat()
+	//压缩图片
+	if fi.Size() >= 1024000 {
+		if ext == ".png" {
+			compressPNG(imgPath)
+		} else {
+			compressJPG(imgPath, 100)
+		}
 	}
 	username, ok := c.Get("user_name")
 	if !ok {
