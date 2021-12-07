@@ -21,5 +21,5 @@ func main() {
 	dao.DB.AutoMigrate(&model.User{})
 	//设置路由
 	r := routers.Router()
-	r.Run(":8080")
+	r.Run(":9999")
 }
